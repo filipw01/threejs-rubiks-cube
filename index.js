@@ -1,9 +1,18 @@
-import * as THREE from "three";
+import {
+  Scene,
+  Color,
+  PerspectiveCamera,
+  WebGLRenderer,
+  AmbientLight,
+  DirectionalLight,
+} from "three";
 import RubiksCube from "./rubiksCube";
-import "regenerator-runtime/runtime";
+import { Interaction } from "three.interaction";
+import { TrackballControls } from "three/examples/jsm/controls/TrackballControls";
 
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(
+const scene = new Scene();
+scene.background = new Color(0xaaaaaa);
+const camera = new PerspectiveCamera(
   75,
   window.innerWidth / window.innerHeight,
   0.1,
@@ -11,53 +20,47 @@ const camera = new THREE.PerspectiveCamera(
 );
 camera.position.x = 10;
 camera.position.z = 10;
-camera.rotation.y = 0.75;
+camera.rotation.y = 10;
+camera.lookAt(0, 0, 0);
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
+const controls = new TrackballControls(camera, renderer.domElement);
+controls.rotateSpeed = 2;
+new Interaction(renderer, scene, camera);
+
 const cube = new RubiksCube(3, 0.1);
 scene.add(cube.mesh);
+cube.registerEvents(camera, scene);
 
-const ambient = new THREE.AmbientLight(0xffffee, 0.5);
+const ambient = new AmbientLight(0xffffee, 0.5);
 scene.add(ambient);
 
-const sun = new THREE.DirectionalLight(0xffffee, 0.7);
-sun.position.x = -10;
-sun.position.y = -100;
-sun.position.z = 200;
+const sun = new DirectionalLight(0xffffee, 0.7);
 scene.add(sun);
-
-cube.turnWall("x", 0, scene).then(() => {
-  cube.turnWall("y", 2, scene).then(() => {
-    cube.turnWall("z", 0, scene).then(() => {
-      cube.turnWall("x", 1, scene).then(() => {
-        cube.turnWall("y", 1, scene).then(() => {
-          cube.turnWall("x", 2, scene).then(() => {
-            cube.turnWall("z", 2, scene).then(() => {
-              cube.turnWall("y", 0, scene).then(() => {
-                cube.turnWall("z", 1, scene).then(() => {
-                  console.log("Turning works");
-                });
-              });
-            });
-          });
-        });
-      });
-    });
-  });
-});
-
 window.addEventListener("mousemove", (e) => {
-  camera.position.x = Math.cos((e.pageX / window.innerWidth) * 10) * 20;
-  camera.position.z = Math.sin((e.pageX / window.innerWidth) * 10) * 20;
-  camera.position.y = Math.sin((e.pageY / window.innerHeight) * 10) * 20;
-  camera.lookAt(0, 0, 0);
+  // const x = (e.clientX / window.innerWidth) * 2 * Math.PI;
+  // const y = (e.clientY / window.innerHeight) * 2 * Math.PI;
+  // camera.position.x = Math.sin(x) * Math.cos(y) * 10;
+  // camera.position.y = Math.sin(y) * 10;
+  // camera.position.z = Math.cos(x) * Math.cos(y) * 10;
+  // camera.lookAt(0, 0, 0);
 });
+// (async () => {
+//   for (let index = 0; index < 6; index++) {
+//     await cube.turnWall("x", 0, scene, -1);
+//     await cube.turnWall("y", 0, scene);
+//     await cube.turnWall("x", 0, scene);
+//     await cube.turnWall("y", 0, scene, -1);
+//   }
+// })();
 
 const animate = function () {
   requestAnimationFrame(animate);
+  controls.update();
+  sun.position.copy(camera.position);
   renderer.render(scene, camera);
 };
 

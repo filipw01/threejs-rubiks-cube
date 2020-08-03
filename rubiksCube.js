@@ -1,18 +1,18 @@
-import * as THREE from "three";
+import { Group, Clock } from "three";
 import Cube from "./cube";
 
 export default class RubiksCube {
   constructor(size = 3, spaceBetween = 0.1) {
     this.size = size;
-    this.mesh = new THREE.Group();
+    this.mesh = new Group();
     this.dimensions = [];
     const colorEnum = {
-      green: 0x00ff00,
-      yellow: 0xffff00,
-      blue: 0x0000ff,
-      red: 0xff0000,
+      green: 0x009b48,
+      yellow: 0xffd500,
+      blue: 0x0045ad,
+      red: 0xcc0000,
       white: 0xffffff,
-      orange: 0xff9800,
+      orange: 0xff5900,
     };
     this.colors = [];
     for (let index = 0; index < size; index++) {
@@ -55,7 +55,7 @@ export default class RubiksCube {
     }
   }
   group(wallAxis, wallNumber, scene) {
-    const group = new THREE.Group();
+    const group = new Group();
     this.mesh.children
       .filter((cube) => cube.position[wallAxis] === this.dimensions[wallNumber])
       .forEach((cube) => {
@@ -200,10 +200,15 @@ export default class RubiksCube {
     this.moveCubesInWall(wall, direction);
     this.rotateCubesInWall(wall, wallAxis, direction);
   }
+  registerEvents(camera, scene) {
+    this.mesh.children.forEach((cube) =>
+      cube.customParent.registerEvents(camera, this.dimensions, scene)
+    );
+  }
   async turnWall(wallAxis, wallNumber, scene, direction = 1) {
     const wall = this.group(wallAxis, wallNumber, scene);
-    const clock = new THREE.Clock(true);
-    const time = 2;
+    const clock = new Clock(true);
+    const time = 0.3;
     let animationFrame;
     const ungroup = this.ungroup.bind(this, wall, scene);
     const paint = this.paint.bind(this);
@@ -219,6 +224,10 @@ export default class RubiksCube {
 
         animationFrame = requestAnimationFrame(animate);
         if (clock.getElapsedTime() >= 1 * time) {
+          for (const cubeMesh of wall.children) {
+            cubeMesh.morphTargetInfluences[0] = Math.abs(Math.sin(Math.PI));
+          }
+          wall.rotation[wallAxis] = (Math.PI / 2) * direction;
           paint(wallAxis, wall, direction);
           ungroup();
           resolve();
