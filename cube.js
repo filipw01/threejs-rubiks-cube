@@ -15,60 +15,6 @@ export default class Cube {
     this.mesh = new Mesh(this.geometry, this.material);
     this.mesh.position.set(x, y, z);
   }
-  calculateScreenPosition(camera) {
-    const projectedVector = this.mesh.position.clone();
-    projectedVector.project(camera);
-    return projectedVector;
-  }
-  registerEvents(camera, dimensions, scene) {
-    let initialDistances;
-    let deltaDistances;
-    this.mesh.on("mousedown", (e) => {
-      const wallCenterVectors = [
-        new Vector3(0, 0, dimensions[0]),
-        new Vector3(0, 0, dimensions[dimensions.length - 1]),
-        new Vector3(0, dimensions[0], 0),
-        new Vector3(0, dimensions[dimensions.length - 1], 0),
-        new Vector3(dimensions[0], 0, 0),
-        new Vector3(dimensions[dimensions.length - 1], 0, 0),
-      ];
-      initialDistances = wallCenterVectors
-        .map((wallCenter) => wallCenter.project(camera))
-        .map((vector) =>
-          vector.distanceTo(this.calculateScreenPosition(camera))
-        );
-      this.calculateScreenPosition(camera);
-    });
-    scene.on("mouseup", () => {
-      if (deltaDistances) console.log(deltaDistances);
-      initialDistances = null;
-      deltaDistances = null;
-    });
-    scene.on("mousemove", (e) => {
-      if (initialDistances) {
-        const wallCenterVectors = [
-          new Vector3(0, 0, dimensions[0]),
-          new Vector3(0, 0, dimensions[dimensions.length - 1]),
-          new Vector3(0, dimensions[0], 0),
-          new Vector3(0, dimensions[dimensions.length - 1], 0),
-          new Vector3(dimensions[0], 0, 0),
-          new Vector3(dimensions[dimensions.length - 1], 0, 0),
-        ];
-        deltaDistances = wallCenterVectors
-          .map((wallCenter) => wallCenter.project(camera))
-          .map(
-            (vector, index) =>
-              vector.distanceTo(
-                new Vector3(
-                  (e.data.originalEvent.clientX / window.innerWidth) * 2 - 1,
-                  (e.data.originalEvent.clientY / window.innerHeight) * 2 - 1,
-                  0
-                )
-              ) - initialDistances[index]
-          );
-      }
-    });
-  }
   get colors() {
     return this._colors;
   }

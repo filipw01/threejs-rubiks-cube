@@ -200,11 +200,6 @@ export default class RubiksCube {
     this.moveCubesInWall(wall, direction);
     this.rotateCubesInWall(wall, wallAxis, direction);
   }
-  registerEvents(camera, scene) {
-    this.mesh.children.forEach((cube) =>
-      cube.customParent.registerEvents(camera, this.dimensions, scene)
-    );
-  }
   async turnWall(wallAxis, wallNumber, scene, direction = 1) {
     const wall = this.group(wallAxis, wallNumber, scene);
     const clock = new Clock(true);
