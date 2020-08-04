@@ -1,7 +1,5 @@
 import {
   Mesh,
-  Vector3,
-  Vector2,
   MeshPhongMaterial,
   BoxBufferGeometry,
   Float32BufferAttribute,
@@ -10,43 +8,44 @@ import {
 export default class Cube {
   constructor(x = 0, y = 0, z = 0, colors = new Array(6).fill(null)) {
     this.geometry = this.createGeometry();
-    this.colors = colors;
-
+    this.material = [];
     this.mesh = new Mesh(this.geometry, this.material);
+    this.colors = colors;
     this.mesh.position.set(x, y, z);
   }
+
   get colors() {
     return this._colors;
   }
+
   set colors(newColors) {
-    this.material = newColors.map((color) => {
-      let materialColor = color;
-      if (color === null) {
-        materialColor = 0xaaaaaa;
-      }
-      return new MeshPhongMaterial({
-        color: materialColor,
-        shininess: 80,
-        flatShading: true,
-        morphTargets: true,
-      });
-    });
-    if (this.mesh) {
-      this.mesh.material = this.material;
-    }
+    // Store raw colors
     this._colors = newColors;
+    this.applyColors();
   }
+
+  applyColors() {
+    // Maps colors to material
+    this.material = this.colors.map(
+      (color) =>
+        new MeshPhongMaterial({
+          color: color === null ? 0xcccccc : color,
+          shininess: 80,
+          flatShading: true,
+          morphTargets: true,
+        })
+    );
+    // Update cube material
+    this.mesh.material = this.material;
+  }
+
   createGeometry() {
+    // Create cube with many vertices
     const geometry = new BoxBufferGeometry(2, 2, 2, 32, 32, 32);
 
-    // create an empty array to hold targets for the attribute we want to morph
-    geometry.morphAttributes.position = [];
-
-    // the original positions of the cube's vertices
-    const positions = geometry.attributes.position.array;
-
-    // for the first morph target we'll move the cube's vertices onto the surface of a sphere
+    // Map vertices onto sphere
     const spherePositions = [];
+    const positions = geometry.attributes.position.array;
 
     for (let i = 0; i < positions.length; i += 3) {
       const x = positions[i];
@@ -60,7 +59,8 @@ export default class Cube {
       );
     }
 
-    // add the spherical positions as the first morph target
+    // Add morphing to sphere as a target
+    geometry.morphAttributes.position = [];
     geometry.morphAttributes.position[0] = new Float32BufferAttribute(
       spherePositions,
       3

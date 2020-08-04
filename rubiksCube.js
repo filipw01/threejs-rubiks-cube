@@ -1,212 +1,164 @@
 import { Group, Clock } from "three";
-import Cube from "./cube";
+import Cube from "./Cube";
 
 export default class RubiksCube {
-  constructor(size = 3, spaceBetween = 0.1) {
+  constructor(scene, size = 3, spaceBetween = 0.1) {
+    this.scene = scene;
     this.size = size;
-    this.mesh = new Group();
-    this.dimensions = [];
-    const colorEnum = {
-      green: 0x009b48,
-      yellow: 0xffd500,
-      blue: 0x0045ad,
-      red: 0xcc0000,
-      white: 0xffffff,
-      orange: 0xff5900,
+    this.positions = RubiksCube.generatePositions(size, spaceBetween);
+    const Color = {
+      GREEN: 0x009b48,
+      YELLOW: 0xffd500,
+      BLUE: 0x0045ad,
+      RED: 0xcc0000,
+      WHITE: 0xffffff,
+      ORANGE: 0xff5900,
     };
-    this.colors = [];
+    this.mesh = RubiksCube.generateCubes(this.positions, Color);
+  }
+
+  static generatePositions(size, spaceBetween) {
+    const positions = [];
     for (let index = 0; index < size; index++) {
       const position = (index - (size - 1) / 2) * (2 + spaceBetween);
-      this.dimensions.push(position);
+      positions.push(position);
     }
-    for (const x of this.dimensions) {
-      const color = [];
-      color[0] = null;
-      color[1] = null;
-      if (x === this.dimensions[0]) {
-        color[1] = colorEnum.green;
-      }
-      if (x === this.dimensions[this.dimensions.length - 1]) {
-        color[0] = colorEnum.white;
-      }
-      for (const y of this.dimensions) {
-        color[3] = null;
-        color[2] = null;
-        if (y === this.dimensions[0]) {
-          color[3] = colorEnum.red;
-        }
-        if (y === this.dimensions[this.dimensions.length - 1]) {
-          color[2] = colorEnum.orange;
-        }
-        for (const z of this.dimensions) {
-          color[4] = null;
-          color[5] = null;
-          if (z === this.dimensions[0]) {
-            color[5] = colorEnum.yellow;
-          }
-          if (z === this.dimensions[this.dimensions.length - 1]) {
-            color[4] = colorEnum.blue;
-          }
-          const cube = new Cube(x, y, z, Array.from(color));
-          cube.mesh.customParent = cube;
-          this.mesh.add(cube.mesh);
-        }
-      }
-    }
+    return positions;
   }
-  group(wallAxis, wallNumber, scene) {
+
+  static generateCubes(positions, Color) {
+    const mesh = new Group();
+    const cubeColors = [];
+    const smallestPosition = positions[0];
+    const biggestPosition = positions[positions.length - 1];
+
+    // Generate 3D colored cubes for Rubik's cube
+    for (const x of positions) {
+      cubeColors[0] = null;
+      cubeColors[1] = null;
+      if (x === biggestPosition) {
+        cubeColors[0] = Color.WHITE;
+      } else if (x === smallestPosition) {
+        cubeColors[1] = Color.GREEN;
+      }
+
+      for (const y of positions) {
+        cubeColors[2] = null;
+        cubeColors[3] = null;
+        if (y === biggestPosition) {
+          cubeColors[2] = Color.ORANGE;
+        } else if (y === smallestPosition) {
+          cubeColors[3] = Color.RED;
+        }
+
+        for (const z of positions) {
+          cubeColors[4] = null;
+          cubeColors[5] = null;
+          if (z === biggestPosition) {
+            cubeColors[4] = Color.BLUE;
+          } else if (z === smallestPosition) {
+            cubeColors[5] = Color.YELLOW;
+          }
+
+          const cube = new Cube(x, y, z, [...cubeColors]);
+          cube.mesh.customParent = cube;
+          mesh.add(cube.mesh);
+        }
+      }
+    }
+    return mesh;
+  }
+
+  group(axis, wallIndex) {
     const group = new Group();
     this.mesh.children
-      .filter((cube) => cube.position[wallAxis] === this.dimensions[wallNumber])
+      .filter((cube) => cube.position[axis] === this.positions[wallIndex])
       .forEach((cube) => {
         group.add(cube);
       });
-    scene.add(group);
+    this.scene.add(group);
     return group;
   }
-  ungroup(wall, scene) {
+
+  ungroup(wall) {
     while (wall.children[0]) {
       this.mesh.add(wall.children[0]);
     }
-    scene.remove(wall);
+    this.scene.remove(wall);
   }
-  moveCubesInWall(wall, direction = 1) {
+
+  moveCubesColors(wall, direction = 1) {
     const movedColors = [];
-    const sortedWallChildren = wall.children.sort(
+    const sortedCubes = wall.children.sort(
       (a, b) =>
         a.position.x - b.position.x ||
         a.position.y - b.position.y ||
         a.position.z - b.position.z
     );
     if (direction === 1) {
-      // Turn left
-      for (let i = 0; i < sortedWallChildren.length; i++) {
+      // Transform to turn counterclockwise
+      for (let i = 0; i < sortedCubes.length; i++) {
         movedColors[i] =
-          sortedWallChildren[
+          sortedCubes[
             i +
               (this.size - 1) * (i + 1) -
               Math.floor(i / this.size) * (this.size * this.size + 1)
           ].customParent.colors;
       }
     } else {
-      for (let i = 0; i < sortedWallChildren.length; i++) {
-        // Turn right
+      for (let i = 0; i < sortedCubes.length; i++) {
+        // Transform to turn clockwise
         movedColors[i] =
-          sortedWallChildren[
-            this.size * (this.size - 1) -
+          sortedCubes[
+            i +
+              this.size * (this.size - 1) -
               (this.size + 1) * i +
-              Math.floor(i / this.size) *
-                (this.size + 1 + this.size * (this.size - 1)) +
-              i
+              Math.floor(i / this.size) * (this.size * this.size + 1)
           ].customParent.colors;
       }
     }
-    sortedWallChildren.forEach((cube, index) => {
+    // Apply colors after transformation
+    sortedCubes.forEach((cube, index) => {
       cube.customParent.colors = movedColors[index];
     });
   }
-  rotateCubesInWall(wall, wallAxis, direction = 1) {
-    switch (wallAxis) {
-      case "x":
-        if (direction === 1) {
-          for (const cube of wall.children) {
-            const [
-              front,
-              back,
-              bottom,
-              top,
-              left,
-              right,
-            ] = cube.customParent.colors;
-            cube.customParent.colors = [front, back, right, left, bottom, top];
-          }
-        } else {
-          for (const cube of wall.children) {
-            const [
-              front,
-              back,
-              bottom,
-              top,
-              left,
-              right,
-            ] = cube.customParent.colors;
-            cube.customParent.colors = [front, back, left, right, top, bottom];
-          }
-        }
-        break;
 
-      case "y":
+  rotateCubesColors(wall, axis, direction = 1) {
+    for (const cube of wall.children) {
+      const [front, back, bottom, top, left, right] = cube.customParent.colors;
+      let z = [front, back];
+      let y = [bottom, top];
+      let x = [left, right];
+      if (axis === "x") {
         if (direction === 1) {
-          for (const cube of wall.children) {
-            const [
-              front,
-              back,
-              bottom,
-              top,
-              left,
-              right,
-            ] = cube.customParent.colors;
-            cube.customParent.colors = [right, left, bottom, top, front, back];
-          }
-        } else {
-          for (const cube of wall.children) {
-            const [
-              front,
-              back,
-              bottom,
-              top,
-              left,
-              right,
-            ] = cube.customParent.colors;
-            cube.customParent.colors = [left, right, bottom, top, back, front];
-          }
-        }
-        break;
-
-      case "z":
+          cube.customParent.colors = [...z, ...x.reverse(), ...y];
+        } else cube.customParent.colors = [...z, ...x, ...y.reverse()];
+      } else if (axis === "y") {
         if (direction === 1) {
-          for (const cube of wall.children) {
-            const [
-              front,
-              back,
-              bottom,
-              top,
-              left,
-              right,
-            ] = cube.customParent.colors;
-            cube.customParent.colors = [top, bottom, front, back, left, right];
-          }
-        } else {
-          for (const cube of wall.children) {
-            const [
-              front,
-              back,
-              bottom,
-              top,
-              left,
-              right,
-            ] = cube.customParent.colors;
-            cube.customParent.colors = [bottom, top, back, front, left, right];
-          }
-        }
-        break;
-
-      default:
-        break;
+          cube.customParent.colors = [...x.reverse(), ...y, ...z];
+        } else cube.customParent.colors = [...x, ...y, ...z.reverse()];
+      } else if (axis === "z") {
+        if (direction === 1) {
+          cube.customParent.colors = [...y.reverse(), ...z, ...x];
+        } else cube.customParent.colors = [...y, ...z.reverse(), ...x];
+      }
     }
   }
-  paint(wallAxis, wall, direction = 1) {
-    if (wallAxis === "y") direction *= -1;
-    this.moveCubesInWall(wall, direction);
-    this.rotateCubesInWall(wall, wallAxis, direction);
+
+  paint(axis, wall, direction = 1) {
+    if (axis === "y") direction *= -1;
+    this.moveCubesColors(wall, direction);
+    this.rotateCubesColors(wall, axis, direction);
   }
-  async turnWall(wallAxis, wallNumber, scene, direction = 1) {
-    const wall = this.group(wallAxis, wallNumber, scene);
+
+  async turnWall(axis, wallNumber, direction = 1) {
+    const wall = this.group(axis, wallNumber);
     const clock = new Clock(true);
     const time = 0.3;
     let animationFrame;
-    const ungroup = this.ungroup.bind(this, wall, scene);
+    const ungroup = this.ungroup.bind(this);
     const paint = this.paint.bind(this);
+
     return new Promise((resolve) => {
       function animate() {
         const ease = 1 - Math.pow(1 - clock.getElapsedTime() / time, 2);
@@ -215,16 +167,17 @@ export default class RubiksCube {
             Math.sin(ease * Math.PI)
           );
         }
-        wall.rotation[wallAxis] = (Math.PI / 2) * ease * direction;
+        wall.rotation[axis] = (Math.PI / 2) * ease * direction;
 
         animationFrame = requestAnimationFrame(animate);
+
         if (clock.getElapsedTime() >= 1 * time) {
           for (const cubeMesh of wall.children) {
             cubeMesh.morphTargetInfluences[0] = Math.abs(Math.sin(Math.PI));
           }
-          wall.rotation[wallAxis] = (Math.PI / 2) * direction;
-          paint(wallAxis, wall, direction);
-          ungroup();
+          wall.rotation[axis] = (Math.PI / 2) * direction;
+          paint(axis, wall, direction);
+          ungroup(wall);
           resolve();
           cancelAnimationFrame(animationFrame);
         }
