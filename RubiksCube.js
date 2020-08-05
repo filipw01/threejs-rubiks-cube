@@ -15,6 +15,7 @@ export default class RubiksCube {
       ORANGE: 0xff5900,
     };
     this.mesh = RubiksCube.generateCubes(this.positions, Color);
+    this.queue = [];
   }
 
   static generatePositions(size, spaceBetween) {
@@ -184,5 +185,18 @@ export default class RubiksCube {
       }
       animate();
     });
+  }
+
+  async queueTurn(axis, wallNumber, direction = 1) {
+    this.queue.push({ axis, wallNumber, direction });
+    if (!this.queueRunning) {
+      this.queueRunning = true;
+      while (this.queue[0]) {
+        const { axis, wallNumber, direction } = this.queue[0];
+        await this.turnWall(axis, wallNumber, direction);
+        this.queue.shift();
+      }
+      this.queueRunning = false;
+    }
   }
 }

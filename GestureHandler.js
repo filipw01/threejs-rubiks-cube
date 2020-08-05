@@ -186,7 +186,7 @@ export default class GestureHandler {
 
   mouseUpHandler() {
     if (this.rotateAxis) {
-      this.cube.turnWall(
+      this.cube.queueTurn(
         this.rotateAxis,
         this.rotateWallNumber,
         this.rotateDirection
