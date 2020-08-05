@@ -3,198 +3,193 @@ const raycaster = new Raycaster();
 
 export default class GestureHandler {
   constructor(camera, renderer, cube) {
-    const initialMouse = {};
-    let deltaNeighbors;
-    window.addEventListener(
-      "mousedown",
-      () => {
-        const mouse = new Vector2(-1, -1);
-        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    this.isIntersecting = false;
+    this.initialMouse;
+    this.camera = camera;
+    this.renderer = renderer;
+    this.cube = cube;
+    this.neighbors;
+    this.rotateAxis;
+    this.rotateWallNumber;
+    this.rotateDirection = 1;
+    document.addEventListener("mousedown", this.mouseDownHandler.bind(this), {
+      capture: true,
+    });
+    document.addEventListener("mousemove", this.mouseMoveHandler.bind(this));
+    document.addEventListener("mouseup", this.mouseUpHandler.bind(this));
+    document.addEventListener("touchstart", this.mouseDownHandler.bind(this), {
+      passive: false,
+    });
+    document.addEventListener("touchmove", this.mouseMoveHandler.bind(this), {
+      passive: false,
+    });
+    document.addEventListener("touchend", this.mouseUpHandler.bind(this));
+  }
 
-        raycaster.setFromCamera(mouse, camera);
-        const intersects = raycaster.intersectObjects(cube.mesh.children);
-        let unlockedAxis;
-        let lockedAxisIndex;
-        let lockedAxis;
-        if (intersects[0]) {
-          event.stopPropagation();
-          initialMouse.x = event.clientX;
-          initialMouse.y = event.clientY;
-          const { x, y, z } = intersects[0].face.normal;
-          if (x !== 0) {
-            lockedAxis = "x";
-            lockedAxisIndex = x;
-            unlockedAxis = ["y", "z"];
-          } else if (y !== 0) {
-            lockedAxis = "y";
-            lockedAxisIndex = y;
-            unlockedAxis = ["x", "z"];
-          } else if (z !== 0) {
-            lockedAxis = "z";
-            lockedAxisIndex = z;
-            unlockedAxis = ["x", "y"];
-          }
-          const neighbors = [
-            intersects[0].object.position.clone(),
-            intersects[0].object.position.clone(),
-          ];
-
-          unlockedAxis.forEach((axis, index) => {
-            if (intersects[0].object.position[axis] === cube.positions[0]) {
-              neighbors[index][axis] = cube.positions[1];
-              neighbors[index].wallNumber = 0;
-            } else {
-              const dimensionIndex = cube.positions.findIndex(
-                (dimension) => dimension === intersects[0].object.position[axis]
-              );
-              neighbors[index][axis] = cube.positions[dimensionIndex - 1];
-              neighbors[index].wallNumber = dimensionIndex;
-            }
-            neighbors[index].axis = axis;
-          });
-
-          const canvas = renderer.domElement;
-          deltaNeighbors = neighbors.map((neighbor) => {
-            neighbor.project(camera);
-            const { x, y, axis, wallNumber } = neighbor;
-            const neighbor2D = {
-              x: Math.round(((x + 1) * canvas.width) / 2),
-              y: Math.round(((-y + 1) * canvas.height) / 2),
-            };
-            const theOtherAxis =
-              unlockedAxis[0] === axis ? unlockedAxis[1] : unlockedAxis[0];
-            return {
-              x: initialMouse.x - neighbor2D.x,
-              y: initialMouse.y - neighbor2D.y,
-              axis,
-              wallNumber,
-              lockedAxis,
-              lockedAxisIndex,
-              reverseDirection:
-                intersects[0].object.position[theOtherAxis] >= 0,
-            };
-          });
-        }
-      },
-      {
-        capture: true,
+  static calculateLockedAxis(faceAxises) {
+    let lockedAxis, lockedAxisIndex;
+    for (const [axis, axisIndex] of Object.entries(faceAxises)) {
+      if (axisIndex !== 0) {
+        lockedAxis = axis;
+        lockedAxisIndex = axisIndex;
       }
-    );
-    let rotateAxis;
-    let rotateWallNumber;
+    }
+    return [lockedAxis, lockedAxisIndex];
+  }
+
+  static calculateUnlockedAxis(lockedAxis) {
+    return ["x", "y", "z"].filter((axis) => axis !== lockedAxis);
+  }
+
+  getRotateDirection(neighbor, deltaDistance) {
+    const { axis: rotateAxis, reverseDirection } = neighbor;
+    const { lockedAxis, lockedAxisIndex } = this;
     let rotateDirection = 1;
-    window.addEventListener("mousemove", (event) => {
-      if (initialMouse.x) {
-        const delta = {
-          x: initialMouse.x - event.clientX,
-          y: initialMouse.y - event.clientY,
+
+    if (
+      (lockedAxisIndex === 1 && lockedAxis === "x" && rotateAxis === "y") ||
+      (lockedAxisIndex === 1 && lockedAxis === "y" && rotateAxis === "z") ||
+      (lockedAxisIndex === 1 && lockedAxis === "z" && rotateAxis === "x") ||
+      (lockedAxisIndex === -1 && lockedAxis === "x" && rotateAxis === "z") ||
+      (lockedAxisIndex === -1 && lockedAxis === "y" && rotateAxis === "x") ||
+      (lockedAxisIndex === -1 && lockedAxis === "z" && rotateAxis === "y")
+    ) {
+      rotateDirection *= -1;
+    }
+
+    if (deltaDistance < 0) {
+      rotateDirection *= -1;
+    }
+    if (reverseDirection) {
+      rotateDirection *= -1;
+    }
+    return rotateDirection;
+  }
+
+  setRotateToNeighbor(index) {
+    const theOtherIndex = Math.abs(index - 1);
+
+    this.rotateAxis = this.neighbors[index].axis;
+    this.rotateWallNumber = this.neighbors[index].wallNumber;
+    this.rotateDirection = this.getRotateDirection(
+      this.neighbors[index],
+      this.initialDistances[theOtherIndex] -
+        this.currentDistances[theOtherIndex]
+    );
+  }
+
+  mouseDownHandler(event) {
+    let clientX, clientY;
+    if (event.clientX) {
+      clientX = event.clientX;
+      clientY = event.clientY;
+    } else {
+      clientX = event.touches[0].clientX;
+      clientY = event.touches[0].clientY;
+    }
+
+    const mouse = new Vector2(
+      (clientX / window.innerWidth) * 2 - 1,
+      -(clientY / window.innerHeight) * 2 + 1
+    );
+    raycaster.setFromCamera(mouse, this.camera);
+    const [firstHit] = raycaster.intersectObjects(this.cube.mesh.children);
+
+    this.isIntersecting = false;
+    if (firstHit) {
+      event.preventDefault();
+      this.isIntersecting = true;
+      this.initialMouse = new Vector2(clientX, clientY);
+      const clickedCube = firstHit.object;
+      const [lockedAxis, lockedAxisIndex] = GestureHandler.calculateLockedAxis(
+        firstHit.face.normal
+      );
+      this.lockedAxis = lockedAxis;
+      this.lockedAxisIndex = lockedAxisIndex;
+      const unlockedAxis = GestureHandler.calculateUnlockedAxis(lockedAxis);
+      const localNeighbors = [
+        clickedCube.position.clone(),
+        clickedCube.position.clone(),
+      ];
+
+      unlockedAxis.forEach((axis, index) => {
+        if (clickedCube.position[axis] === this.cube.positions[0]) {
+          localNeighbors[index][axis] = this.cube.positions[1];
+          localNeighbors[index].wallNumber = 0;
+        } else {
+          const positionIndex = this.cube.positions.findIndex(
+            (dimension) => dimension === clickedCube.position[axis]
+          );
+          localNeighbors[index][axis] = this.cube.positions[positionIndex - 1];
+          localNeighbors[index].wallNumber = positionIndex;
+        }
+        localNeighbors[index].axis = axis;
+      });
+
+      const canvas = this.renderer.domElement;
+      this.neighbors = localNeighbors.map((neighbor) => {
+        neighbor.project(this.camera);
+        const { x, y, axis, wallNumber } = neighbor;
+        const theOtherAxis =
+          unlockedAxis[0] === axis ? unlockedAxis[1] : unlockedAxis[0];
+        return {
+          x: Math.round(((x + 1) * canvas.width) / 2),
+          y: Math.round(((-y + 1) * canvas.height) / 2),
+          axis,
+          wallNumber,
+          reverseDirection: clickedCube.position[theOtherAxis] >= 0,
         };
-        const offset = Math.sqrt(Math.pow(delta.x, 2) + Math.pow(delta.y, 2));
-        if (offset > 5 && !rotateAxis) {
-          const initialDistances = [
-            Math.sqrt(
-              Math.pow(deltaNeighbors[0].x, 2) +
-                Math.pow(deltaNeighbors[0].y, 2)
-            ),
-            Math.sqrt(
-              Math.pow(deltaNeighbors[1].x, 2) +
-                Math.pow(deltaNeighbors[1].y, 2)
-            ),
-          ];
-          const currentDistances = [
-            Math.sqrt(
-              Math.pow(deltaNeighbors[0].x - delta.x, 2) +
-                Math.pow(deltaNeighbors[0].y - delta.y, 2)
-            ),
-            Math.sqrt(
-              Math.pow(deltaNeighbors[1].x - delta.x, 2) +
-                Math.pow(deltaNeighbors[1].y - delta.y, 2)
-            ),
-          ];
-          const deltaDistances = [
-            Math.abs(initialDistances[0] - currentDistances[0]),
-            Math.abs(initialDistances[1] - currentDistances[1]),
-          ];
-          const lockedAxisIndex = deltaNeighbors[0].lockedAxisIndex;
-          const lockedAxis = deltaNeighbors[0].lockedAxis;
-          if (deltaDistances[0] > deltaDistances[1]) {
-            rotateAxis = deltaNeighbors[1].axis;
-            rotateWallNumber = deltaNeighbors[1].wallNumber;
-            rotateDirection = 1;
+      });
+    }
+  }
 
-            if (
-              (lockedAxisIndex === 1 &&
-                lockedAxis === "x" &&
-                rotateAxis === "y") ||
-              (lockedAxisIndex === 1 &&
-                lockedAxis === "y" &&
-                rotateAxis === "z") ||
-              (lockedAxisIndex === 1 &&
-                lockedAxis === "z" &&
-                rotateAxis === "x") ||
-              (lockedAxisIndex === -1 &&
-                lockedAxis === "x" &&
-                rotateAxis === "z") ||
-              (lockedAxisIndex === -1 &&
-                lockedAxis === "y" &&
-                rotateAxis === "") ||
-              (lockedAxisIndex === -1 &&
-                lockedAxis === "z" &&
-                rotateAxis === "y")
-            ) {
-              rotateDirection *= -1;
-            }
+  mouseMoveHandler(event) {
+    let clientX, clientY;
+    if (event.clientX) {
+      clientX = event.clientX;
+      clientY = event.clientY;
+    } else {
+      clientX = event.touches[0].clientX;
+      clientY = event.touches[0].clientY;
+    }
 
-            if (initialDistances[0] - currentDistances[0] < 0) {
-              rotateDirection *= -1;
-            }
-            if (deltaNeighbors[1].reverseDirection) {
-              rotateDirection *= -1;
-            }
-          } else {
-            rotateAxis = deltaNeighbors[0].axis;
-            rotateWallNumber = deltaNeighbors[0].wallNumber;
-            rotateDirection = 1;
+    if (this.initialMouse) {
+      event.preventDefault();
+      const currentMouse = new Vector2(clientX, clientY);
+      const offset = this.initialMouse.distanceTo(currentMouse);
 
-            if (
-              (lockedAxisIndex === 1 &&
-                lockedAxis === "x" &&
-                rotateAxis === "y") ||
-              (lockedAxisIndex === 1 &&
-                lockedAxis === "y" &&
-                rotateAxis === "z") ||
-              (lockedAxisIndex === 1 &&
-                lockedAxis === "z" &&
-                rotateAxis === "x") ||
-              (lockedAxisIndex === -1 &&
-                lockedAxis === "x" &&
-                rotateAxis === "z") ||
-              (lockedAxisIndex === -1 &&
-                lockedAxis === "y" &&
-                rotateAxis === "x") ||
-              (lockedAxisIndex === -1 &&
-                lockedAxis === "z" &&
-                rotateAxis === "y")
-            ) {
-              rotateDirection *= -1;
-            }
-
-            if (initialDistances[1] - currentDistances[1] < 0) {
-              rotateDirection *= -1;
-            }
-            if (deltaNeighbors[0].reverseDirection) {
-              rotateDirection *= -1;
-            }
-          }
+      if (offset > 5 && !this.rotateAxis) {
+        this.initialDistances = [
+          this.initialMouse.distanceTo(this.neighbors[0]),
+          this.initialMouse.distanceTo(this.neighbors[1]),
+        ];
+        this.currentDistances = [
+          currentMouse.distanceTo(this.neighbors[0]),
+          currentMouse.distanceTo(this.neighbors[1]),
+        ];
+        const deltaDistances = this.initialDistances.map(
+          (initialDistance, index) =>
+            Math.abs(initialDistance - this.currentDistances[index])
+        );
+        if (deltaDistances[0] < deltaDistances[1]) {
+          this.setRotateToNeighbor(0);
+        } else {
+          this.setRotateToNeighbor(1);
         }
       }
-    });
-    window.addEventListener("mouseup", () => {
-      cube.turnWall(rotateAxis, rotateWallNumber, rotateDirection);
-      rotateAxis = undefined;
-      delete initialMouse.x;
-      delete initialMouse.y;
-    });
+    }
+  }
+
+  mouseUpHandler() {
+    if (this.rotateAxis) {
+      this.cube.turnWall(
+        this.rotateAxis,
+        this.rotateWallNumber,
+        this.rotateDirection
+      );
+    }
+    this.rotateAxis = null;
+    this.initialMouse = null;
+    this.initialMouse = null;
   }
 }
