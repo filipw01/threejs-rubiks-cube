@@ -6,7 +6,7 @@ import {
   AmbientLight,
   DirectionalLight,
 } from "three";
-import RubiksCube from "./RubiksCube.js";
+import RubiksCube from "./RubiksCube";
 import GestureHandler from "./GestureHandler";
 import { TrackballControls } from "three/examples/jsm/controls/TrackballControls";
 
