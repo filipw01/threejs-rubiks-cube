@@ -7,6 +7,7 @@ export default class RubiksCube {
     this.size = size;
     this.positions = RubiksCube.generatePositions(size, spaceBetween);
     const Color = {
+      DEFAULT: 0xcccccc,
       GREEN: 0x009b48,
       YELLOW: 0xffd500,
       BLUE: 0x0045ad,
@@ -35,34 +36,37 @@ export default class RubiksCube {
 
     // Generate 3D colored cubes for Rubik's cube
     for (const x of positions) {
-      cubeColors[0] = null;
-      cubeColors[1] = null;
+      cubeColors[0] = Color.DEFAULT;
+      cubeColors[1] = Color.DEFAULT;
       if (x === biggestPosition) {
         cubeColors[0] = Color.WHITE;
-      } else if (x === smallestPosition) {
+      }
+      if (x === smallestPosition) {
         cubeColors[1] = Color.GREEN;
       }
 
       for (const y of positions) {
-        cubeColors[2] = null;
-        cubeColors[3] = null;
+        cubeColors[2] = Color.DEFAULT;
+        cubeColors[3] = Color.DEFAULT;
         if (y === biggestPosition) {
           cubeColors[2] = Color.ORANGE;
-        } else if (y === smallestPosition) {
+        }
+        if (y === smallestPosition) {
           cubeColors[3] = Color.RED;
         }
 
         for (const z of positions) {
-          cubeColors[4] = null;
-          cubeColors[5] = null;
+          cubeColors[4] = Color.DEFAULT;
+          cubeColors[5] = Color.DEFAULT;
           if (z === biggestPosition) {
             cubeColors[4] = Color.BLUE;
-          } else if (z === smallestPosition) {
+          }
+          if (z === smallestPosition) {
             cubeColors[5] = Color.YELLOW;
           }
 
           const cube = new Cube(x, y, z, [...cubeColors]);
-          cube.mesh.customParent = cube;
+          cube.mesh.origin = cube;
           mesh.add(cube.mesh);
         }
       }
@@ -104,7 +108,7 @@ export default class RubiksCube {
             i +
               (this.size - 1) * (i + 1) -
               Math.floor(i / this.size) * (this.size * this.size + 1)
-          ].customParent.colors;
+          ].origin.colors;
       }
     } else {
       for (let i = 0; i < sortedCubes.length; i++) {
@@ -115,33 +119,33 @@ export default class RubiksCube {
               this.size * (this.size - 1) -
               (this.size + 1) * i +
               Math.floor(i / this.size) * (this.size * this.size + 1)
-          ].customParent.colors;
+          ].origin.colors;
       }
     }
     // Apply colors after transformation
     sortedCubes.forEach((cube, index) => {
-      cube.customParent.colors = movedColors[index];
+      cube.origin.colors = movedColors[index];
     });
   }
 
   rotateCubesColors(wall, axis, direction = 1) {
     for (const cube of wall.children) {
-      const [front, back, bottom, top, left, right] = cube.customParent.colors;
+      const [front, back, bottom, top, left, right] = cube.origin.colors;
       let z = [front, back];
       let y = [bottom, top];
       let x = [left, right];
       if (axis === "x") {
         if (direction === 1) {
-          cube.customParent.colors = [...z, ...x.reverse(), ...y];
-        } else cube.customParent.colors = [...z, ...x, ...y.reverse()];
+          cube.origin.colors = [...z, ...x.reverse(), ...y];
+        } else cube.origin.colors = [...z, ...x, ...y.reverse()];
       } else if (axis === "y") {
         if (direction === 1) {
-          cube.customParent.colors = [...x.reverse(), ...y, ...z];
-        } else cube.customParent.colors = [...x, ...y, ...z.reverse()];
+          cube.origin.colors = [...x.reverse(), ...y, ...z];
+        } else cube.origin.colors = [...x, ...y, ...z.reverse()];
       } else if (axis === "z") {
         if (direction === 1) {
-          cube.customParent.colors = [...y.reverse(), ...z, ...x];
-        } else cube.customParent.colors = [...y, ...z.reverse(), ...x];
+          cube.origin.colors = [...y.reverse(), ...z, ...x];
+        } else cube.origin.colors = [...y, ...z.reverse(), ...x];
       }
     }
   }
@@ -150,6 +154,40 @@ export default class RubiksCube {
     if (axis === "y") direction *= -1;
     this.moveCubesColors(wall, direction);
     this.rotateCubesColors(wall, axis, direction);
+  }
+
+  static randomRange(start, end) {
+    if (start > end) throw new Error("Invalid range");
+    const min = Math.ceil(start);
+    const max = Math.floor(end);
+
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+  shuffle(numberOfTurns = 20, animate = false) {
+    for (let i = 0; i < numberOfTurns; i++) {
+      const randomWallNumber = RubiksCube.randomRange(0, this.size - 1);
+      const randomDirection = Math.random > 0.5 ? 1 : -1;
+      let randomAxis;
+      switch (RubiksCube.randomRange(0, 2)) {
+        case 0:
+          randomAxis = "x";
+          break;
+        case 1:
+          randomAxis = "y";
+          break;
+        case 2:
+          randomAxis = "z";
+          break;
+      }
+      if (animate) {
+        this.queueTurn(randomAxis, randomWallNumber, randomDirection);
+      } else {
+        const wall = this.group(randomAxis, randomWallNumber);
+        this.paint(randomAxis, wall, randomDirection);
+        this.ungroup(wall);
+      }
+    }
   }
 
   async turnWall(axis, wallNumber, direction = 1) {
@@ -187,16 +225,19 @@ export default class RubiksCube {
     });
   }
 
-  async queueTurn(axis, wallNumber, direction = 1) {
+  queueTurn(axis, wallNumber, direction = 1) {
     this.queue.push({ axis, wallNumber, direction });
     if (!this.queueRunning) {
-      this.queueRunning = true;
-      while (this.queue[0]) {
-        const { axis, wallNumber, direction } = this.queue[0];
-        await this.turnWall(axis, wallNumber, direction);
-        this.queue.shift();
-      }
-      this.queueRunning = false;
+      this.queueWaiter = new Promise(async (resolve) => {
+        this.queueRunning = true;
+        while (this.queue[0]) {
+          const { axis, wallNumber, direction } = this.queue[0];
+          await this.turnWall(axis, wallNumber, direction);
+          this.queue.shift();
+        }
+        this.queueRunning = false;
+        resolve();
+      });
     }
   }
 }

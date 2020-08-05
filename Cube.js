@@ -7,7 +7,7 @@ import {
 
 export default class Cube {
   constructor(x = 0, y = 0, z = 0, colors = new Array(6).fill(null)) {
-    this.geometry = this.createGeometry();
+    this.geometry = Cube.createGeometry();
     this.material = [];
     this.mesh = new Mesh(this.geometry, this.material);
     this.colors = colors;
@@ -29,7 +29,7 @@ export default class Cube {
     this.material = this.colors.map(
       (color) =>
         new MeshPhongMaterial({
-          color: color === null ? 0xcccccc : color,
+          color: color === null || color === undefined ? 0xcccccc : color,
           shininess: 80,
           flatShading: true,
           morphTargets: true,
@@ -39,7 +39,7 @@ export default class Cube {
     this.mesh.material = this.material;
   }
 
-  createGeometry() {
+  static createGeometry() {
     // Create cube with many vertices
     const geometry = new BoxBufferGeometry(2, 2, 2, 32, 32, 32);
 

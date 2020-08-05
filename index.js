@@ -38,7 +38,12 @@ const sun = new DirectionalLight(0xffffee, 0.7);
 scene.add(sun);
 
 const cube = new RubiksCube(scene);
+cube.shuffle();
 scene.add(cube.mesh);
+
+document.querySelector(".shuffleButton").addEventListener("click", () => {
+  cube.shuffle(20, true);
+});
 
 const gesture = new GestureHandler(camera, renderer, cube);
 

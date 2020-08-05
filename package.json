@@ -6,7 +6,7 @@
   "scripts": {
     "start": "parcel -p 3000 index.html",
     "build": "parcel build index.html",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest"
   },
   "author": "Filip Wachowiak",
   "license": "ISC",
@@ -16,6 +16,7 @@
   },
   "devDependencies": {
     "babel-core": "^6.26.3",
-    "babel-preset-env": "^1.7.0"
+    "babel-preset-env": "^1.7.0",
+    "jest": "^26.2.2"
   }
 }
