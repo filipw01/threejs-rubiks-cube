@@ -42,22 +42,11 @@ scene.add(cube.mesh);
 
 const gesture = new GestureHandler(camera, renderer, cube);
 
-// (async () => {
-//   for (let index = 0; index < 6; index++) {
-//     await cube.turnWall("x", 0, -1);
-//     await cube.turnWall("y", 0);
-//     await cube.turnWall("x", 0);
-//     await cube.turnWall("y", 0, -1);
-//   }
-// })();
-
 function animate() {
   requestAnimationFrame(animate);
   if (!gesture.isIntersecting) {
-    controls.enabled = true;
     controls.update();
   } else {
-    controls.enabled = false;
   }
   sun.position.copy(camera.position);
   renderer.render(scene, camera);

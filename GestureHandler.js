@@ -19,9 +19,11 @@ export default class GestureHandler {
     document.addEventListener("mouseup", this.mouseUpHandler.bind(this));
     document.addEventListener("touchstart", this.mouseDownHandler.bind(this), {
       passive: false,
+      capture: true,
     });
     document.addEventListener("touchmove", this.mouseMoveHandler.bind(this), {
       passive: false,
+      capture: true,
     });
     document.addEventListener("touchend", this.mouseUpHandler.bind(this));
   }
@@ -98,6 +100,7 @@ export default class GestureHandler {
     this.isIntersecting = false;
     if (firstHit) {
       event.preventDefault();
+      event.stopPropagation();
       this.isIntersecting = true;
       this.initialMouse = new Vector2(clientX, clientY);
       const clickedCube = firstHit.object;
@@ -155,6 +158,7 @@ export default class GestureHandler {
 
     if (this.initialMouse) {
       event.preventDefault();
+      event.stopPropagation();
       const currentMouse = new Vector2(clientX, clientY);
       const offset = this.initialMouse.distanceTo(currentMouse);
 
