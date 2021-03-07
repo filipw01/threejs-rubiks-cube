@@ -12,11 +12,11 @@ export default class GestureHandler {
     this.rotateAxis;
     this.rotateWallNumber;
     this.rotateDirection = 1;
-    document.addEventListener("mousedown", this.mouseDownHandler.bind(this), {
+    document.addEventListener("pointerdown", this.mouseDownHandler.bind(this), {
       capture: true,
     });
-    document.addEventListener("mousemove", this.mouseMoveHandler.bind(this));
-    document.addEventListener("mouseup", this.mouseUpHandler.bind(this));
+    document.addEventListener("pointermove", this.mouseMoveHandler.bind(this));
+    document.addEventListener("pointerup", this.mouseUpHandler.bind(this));
     document.addEventListener("touchstart", this.mouseDownHandler.bind(this), {
       passive: false,
       capture: true,
